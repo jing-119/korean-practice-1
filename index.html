@@ -572,3 +572,28 @@ init();
 </script>
 </body>
 </html>
+<!-- 單字庫分頁加批量新增按鈕 -->
+<button id="batchAddBtn">批量新增單字</button>
+
+<script>
+document.getElementById('batchAddBtn').addEventListener('click', () => {
+    const input = prompt("請輸入單字（每行：韓文 中文 [例句]）：");
+    if (!input) return;
+
+    const lines = input.trim().split("\n");
+    let words = JSON.parse(localStorage.getItem("words") || "[]");
+
+    lines.forEach(line => {
+        const parts = line.trim().split(/\s+/);
+        if (parts.length >= 2) {
+            const [word, meaning, ...exampleArr] = parts;
+            const example = exampleArr.join(" ");
+            words.push({ word, meaning, example });
+        }
+    });
+
+    localStorage.setItem("words", JSON.stringify(words));
+    alert(`已新增 ${lines.length} 筆單字！`);
+    location.reload(); // 重新載入讓列表更新
+});
+</script>
