@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>韓語單字＋文法練習工具</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="icon" href="data:," />
+  <style>
+    .tab-active{ @apply bg-slate-900 text-white } /* requires JIT; fallback below */
+    .btn{ @apply px-3 py-2 rounded-xl shadow text-sm border border-slate-300 } 
+    .btn-primary{ @apply bg-slate-900 text-white border-slate-900 }
+    .btn-ghost{ @apply border-transparent text-slate-700 }
+    .chip{ @apply text-xs px-2 py-1 rounded-full bg-slate-100 border border-slate-200 }
+    /* Fallback for environments without Tailwind JIT @apply: */
+    .btn{ padding:.5rem .75rem;border-radius:1rem;box-shadow:0 1px 2px rgba(0,0,0,.08);font-size:.9rem;border:1px solid #cbd5e1 }
+    .btn-primary{ background:#0f172a;color:#fff;border-color:#0f172a }
+    .btn-ghost{ border-color:transparent;color:#334155 }
+    .chip{ font-size:.75rem;padding:.25rem .5rem;border-radius:9999px;background:#f1f5f9;border:1px solid #e2e8f0 }
+    .tab-active{ background:#0f172a;color:#fff }
+    input[type="date"]{ color-scheme: light; }
+  </style>
+</head>
+<body class="min-h-screen bg-slate-50 text-slate-800">
+  <div class="max-w-6xl mx-auto p-4 md:p-8">
+    <header class="flex items-center gap-3 mb-4">
+      <h1 class="text-2xl md:text-3xl font-bold">韓語單字＋文法練習工具</h1>
+      <span class="chip">離線可用 / localStorage</span>
+      <span class="chip">JSON 匯入/匯出</span>
+    </header>
+
+    <!-- Nav Tabs -->
+    <nav class="flex flex-wrap gap-2 mb-6">
+      <button class="btn tab-btn tab-active" data-tab="review">閱讀卡/複習</button>
+      <button class="btn tab-btn" data-tab="quiz">測驗（選擇題/拼寫題）</button>
+      <button class="btn tab-btn" data-tab="grammar">文法（題庫可自訂）</button>
+      <button class="btn tab-btn" data-tab="vocab">單字庫（搜尋/排序/編輯/刪除）</button>
+      <button class="btn tab-btn" data-tab="settings">設定 / 匯入匯出</button>
+    </nav>
+
+    <!-- Main Panels -->
+    <section id="panel-review" class="tab-panel">
+      <div class="grid md:grid-cols-3 gap-4 items-start">
+        <div class="md:col-span-2">
+          <div id="flashcard" class="rounded-2xl bg-white border border-slate-200 shadow-sm p-6 min-h-[220px] flex flex-col justify-between">
+            <div>
+              <div class="text-sm text-slate-500">今日到期 / 未複習：</div>
+              <div class="mt-1 text-3xl font-semibold" id="card-front">—</div>
+              <div class="mt-2 text-slate-500" id="card-meta"></div>
+              <div class="mt-4 hidden" id="card-back">
+                <div class="text-lg"><span class="font-semibold">釋義：</span><span id="card-meaning"></span></div>
+                <div class="mt-2 text-sm" id="card-example"></div>
+              </div>
+            </div>
+            <div class="flex gap-2 mt-6">
+              <button id="btn-show" class="btn">顯示答案</button>
+              <button id="btn-forgot" class="btn" disabled>忘記</button>
+              <button id="btn-good" class="btn btn-primary" disabled>記得</button>
+              <button id="btn-skip" class="btn" title="跳過此卡">跳過</button>
+            </div>
+          </div>
+        </div>
+        <aside class="space-y-3">
+          <div class="rounded-2xl bg-white border border-slate-200 p-4">
+            <div class="font-semibold mb-2">複習統計（今日）</div>
+            <div class="text-sm" id="review-stats">—</div>
+          </div>
+          <div class="rounded-2xl bg-white border border-slate-200 p-4">
+            <div class="font-semibold mb-2">Leitner 盒</div>
+            <div id="leitner-boxes" class="grid grid-cols-5 gap-2 text-center text-xs"></div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="panel-quiz" class="tab-panel hidden">
+      <div class="grid md:grid-cols-2 gap-4 items-start">
+        <div class="rounded-2xl bg-white border border-slate-200 shadow-sm p-6">
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="font-semibold">選擇題</h2>
+            <button id="btn-next-mcq" class="btn">換一題</button>
+          </div>
+          <div id="mcq-area">
+            <div id="mcq-question" class="text-xl font-semibold mb-3">—</div>
+            <div id="mcq-options" class="space-y-2"></div>
+            <div id="mcq-feedback" class="mt-3 text-sm"> </div>
+          </div>
+        </div>
+        <div class="rounded-2xl bg-white border border-slate-200 shadow-sm p-6">
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="font-semibold">拼寫題</h2>
+            <button id="btn-next-spell" class="btn">換一題</button>
+          </div>
+          <div id="spell-area">
+            <div id="spell-prompt" class="text-xl font-semibold mb-3">—</div>
+            <input id="spell-input" class="w-full border border-slate-300 rounded-xl px-3 py-2" placeholder="輸入對應的韓文拼寫…" />
+            <div class="flex gap-2 mt-3">
+              <button id="btn-check-spell" class="btn btn-primary">檢查</button>
+              <button id="btn-show-spell" class="btn">顯示答案</button>
+            </div>
+            <div id="spell-feedback" class="mt-3 text-sm"> </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="panel-grammar" class="tab-panel hidden">
+      <div class="grid md:grid-cols-3 gap-4 items-start">
+        <div class="md:col-span-2 rounded-2xl bg-white border border-slate-200 shadow-sm p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="font-semibold">文法測驗</h2>
+            <button id="btn-next-gram" class="btn">換一題</button>
+          </div>
+          <div id="gram-area">
+            <div id="gram-question" class="text-lg font-semibold mb-3">—</div>
+            <div id="gram-options" class="space-y-2"></div>
+            <div id="gram-feedback" class="mt-3 text-sm"> </div>
+          </div>
+        </div>
+        <aside class="rounded-2xl bg-white border border-slate-200 shadow-sm p-6">
+          <h3 class="font-semibold mb-2">新增文法題</h3>
+          <form id="gram-form" class="space-y-2">
+            <input required class="w-full border border-slate-300 rounded-xl px-3 py-2" id="gq" placeholder="題目（可含空格：例如 用 ~고 나서 造句）」 />
+            <input required class="w-full border border-slate-300 rounded-xl px-3 py-2" id="ga" placeholder="正確答案（或選項索引 0-3）」 />
+            <input class="w-full border border-slate-300 rounded-xl px-3 py-2" id="gopts" placeholder="選項（以 | 分隔，可留空代表主觀題）」 />
+            <textarea class="w-full border border-slate-300 rounded-xl px-3 py-2" id="gexp" placeholder="解說（可空）"></textarea>
+            <button class="btn btn-primary w-full" type="submit">加入題目</button>
+          </form>
+        </aside>
+      </div>
+    </section>
+
+    <section id="panel-vocab" class="tab-panel hidden">
+      <div class="rounded-2xl bg-white border border-slate-200 shadow-sm p-6">
+        <div class="flex flex-col md:flex-row md:items-center gap-2 md:gap-3 mb-3">
+          <input id="v-search" class="border border-slate-300 rounded-xl px-3 py-2 flex-1" placeholder="搜尋 韓文/釋義/註記/詞性…" />
+          <select id="v-sort" class="border border-slate-300 rounded-xl px-3 py-2">
+            <option value="ko">按韓文</option>
+            <option value="meaning">按釋義</option>
+            <option value="box">按盒位（升序）</option>
+            <option value="level">按難度</option>
+            <option value="nextDue">按到期日</option>
+          </select>
+          <button id="btn-add-vocab" class="btn btn-primary">新增單字</button>
+        </div>
+        <div id="vocab-table" class="overflow-auto">
+          <!-- table will render here -->
+        </div>
+      </div>
+    </section>
+
+    <section id="panel-settings" class="tab-panel hidden">
+      <div class="grid md:grid-cols-2 gap-4 items-start">
+        <div class="rounded-2xl bg-white border border-slate-200 shadow-sm p-6 space-y-3">
+          <h2 class="font-semibold">設定</h2>
+          <label class="block text-sm">Leitner 間隔（天，逗號分隔）：
+            <input id="s-intervals" class="w-full border border-slate-300 rounded-xl px-3 py-2 mt-1" />
+          </label>
+          <label class="block text-sm">每日新卡上限：
+            <input id="s-daily" type="number" min="1" class="w-full border border-slate-300 rounded-xl px-3 py-2 mt-1" />
+          </label>
+          <div class="flex gap-2 pt-2">
+            <button id="btn-save-settings" class="btn btn-primary">儲存設定</button>
+            <button id="btn-reset" class="btn" title="清除所有資料（不可復原）">重設資料庫</button>
+          </div>
+        </div>
+        <div class="rounded-2xl bg-white border border-slate-200 shadow-sm p-6 space-y-3">
+          <h2 class="font-semibold">匯入 / 匯出</h2>
+          <div class="flex gap-2 items-center">
+            <button id="btn-export" class="btn">匯出 JSON</button>
+            <input type="file" id="file-import" accept="application/json" class="hidden" />
+            <button id="btn-import" class="btn">匯入 JSON</button>
+          </div>
+          <p class="text-sm text-slate-600">備份包含單字庫、Leitner 盒位/到期日、文法題庫與統計。可跨裝置復原。</p>
+        </div>
+      </div>
+    </section>
+
+    <footer class="mt-8 text-center text-xs text-slate-500">
+      MIT License · 本工具在你的瀏覽器端運行，資料只存於 localStorage。
+    </footer>
+  </div>
+
+<script>
+// ====== Data Model & Storage ======
+const LS_KEY = 'krstudy_data_v1';
+const todayStr = () => new Date().toISOString().slice(0,10);
+const uid = () => Math.random().toString(36).slice(2,10);
+
+const SAMPLE_DATA = {
+  settings: { leitnerIntervals: [0,1,2,4,7,15], dailyNew: 20 },
+  stats: { review: {}, quiz: { mcqCorrect:0, mcqTotal:0, spellCorrect:0, spellTotal:0 } },
+  vocab: [
+    { id: uid(), ko: '안녕하세요', reading: 'annyeonghaseyo', pos: '감탄사', meaning: '你好（您好）', examples: '안녕하세요? 만나서 반가워요.', tags: '打招呼', level: 1, box: 1, nextDue: todayStr() },
+    { id: uid(), ko: '학교', reading: 'hakgyo', pos: '명사', meaning: '學校', examples: '저는 학교에 가요.', tags: '場所', level: 1, box: 1, nextDue: todayStr() },
+    { id: uid(), ko: '먹다', reading: 'meokda', pos: '동사', meaning: '吃', examples: '밥을 먹어요.', tags: '動作', level: 1, box: 1, nextDue: todayStr() },
+    { id: uid(), ko: '예쁘다', reading: 'yeppeuda', pos: '형용사', meaning: '漂亮', examples: '꽃이 예뻐요.', tags: '形容', level: 2, box: 1, nextDue: todayStr() },
+    { id: uid(), ko: '책', reading: 'chaek', pos: '명사', meaning: '書', examples: '책을 읽어요.', tags: '物品', level: 1, box: 1, nextDue: todayStr() },
+  ],
+  grammar: [
+    { id: uid(), question: '「-고 나서」的用法是？', options: ['表示同時進行','表示動作結束後','表示原因','表示對比'], answer: 1, explanation: '「-고 나서」表示做完前一個動作之後再做後一個動作。' },
+    { id: uid(), question: '請用「-지만」造句表對比（主觀題）', options: [], answer: '開放作答', explanation: '例如: 비싸지만 좋아요.' }
+  ]
+};
+
+function loadData(){
+  try{
+    const raw = localStorage.getItem(LS_KEY);
+    if(!raw){ saveData(structuredClone(SAMPLE_DATA)); return structuredClone(SAMPLE_DATA); }
+    const data = JSON.parse(raw);
+    // migrate fields if needed
+    data.settings ||= { leitnerIntervals:[0,1,2,4,7,15], dailyNew:20 };
+    data.stats ||= { review:{}, quiz:{ mcqCorrect:0, mcqTotal:0, spellCorrect:0, spellTotal:0 } };
+    data.vocab ||= [];
+    data.grammar ||= [];
+    return data;
+  }catch(e){ console.error(e); alert('資料讀取錯誤，已載入預設資料'); saveData(SAMPLE_DATA); return structuredClone(SAMPLE_DATA); }
+}
+function saveData(data){ localStorage.setItem(LS_KEY, JSON.stringify(data)); }
+let DB = loadData();
+
+// ====== Tabs ======
+const tabs = document.querySelectorAll('.tab-btn');
+const panels = {
+  review: document.getElementById('panel-review'),
+  quiz: document.getElementById('panel-quiz'),
+  grammar: document.getElementById('panel-grammar'),
+  vocab: document.getElementById('panel-vocab'),
+  settings: document.getElementById('panel-settings'),
+};
+
+tabs.forEach(btn=>btn.addEventListener('click',()=>{
+  tabs.forEach(b=>b.classList.remove('tab-active'));
+  btn.classList.add('tab-active');
+  Object.values(panels).forEach(p=>p.classList.add('hidden'));
+  panels[btn.dataset.tab].classList.remove('hidden');
+  if(btn.dataset.tab==='vocab') renderVocab();
+  if(btn.dataset.tab==='settings') renderSettings();
+  if(btn.dataset.tab==='review') refreshReview();
+  if(btn.dataset.tab==='quiz') newMCQ()||newSpell();
+}));
+
+// ====== Leitner Review ======
+const cardFront = document.getElementById('card-front');
+const cardBack = document.getElementById('card-back');
+const cardMeaning = document.getElementById('card-meaning');
+const cardExample = document.getElementById('card-example');
+const cardMeta = document.getElementById('card-meta');
+const btnShow = document.getElementById('btn-show');
+const btnForgot = document.getElementById('btn-forgot');
+const btnGood = document.getElementById('btn-good');
+const btnSkip = document.getElementById('btn-skip');
+const statsEl = document.getElementById('review-stats');
+const boxesEl = document.getElementById('leitner-boxes');
+let reviewQueue = [];
+let currentCard = null;
+
+function nextDueDate(box){
+  const d = new Date();
+  const days = DB.settings.leitnerIntervals[Math.min(box-1, DB.settings.leitnerIntervals.length-1)] || 0;
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0,10);
+}
+
+function buildReviewQueue(){
+  const today = todayStr();
+  reviewQueue = DB.vocab.filter(v=>v.nextDue<=today).sort((a,b)=> (a.box-b.box)||a.ko.localeCompare(b.ko));
+}
+
+function refreshBoxes(){
+  boxesEl.innerHTML='';
+  const counts = [0,0,0,0,0,0,0];
+  DB.vocab.forEach(v=>{ counts[v.box||1] = (counts[v.box||1]||0)+1; });
+  for(let i=1;i<=6;i++){
+    const div = document.createElement('div');
+    div.className='p-2 rounded-xl border border-slate-200 bg-white';
+    div.innerHTML = `<div class="text-xs text-slate-500">盒 ${i}</div><div class="text-lg font-semibold">${counts[i]||0}</div>`;
+    boxesEl.appendChild(div);
+  }
+}
+
+function refreshReview(){
+  buildReviewQueue();
+  refreshBoxes();
+  statsEl.textContent = `到期：${reviewQueue.length} 張`;
+  drawNextCard();
+}
+
+function drawNextCard(){
+  currentCard = reviewQueue.shift() || null;
+  if(!currentCard){
+    cardFront.textContent='🎉 今日沒有到期的卡片了！';
+    cardMeta.textContent='可到「單字庫」新增單字，或到「測驗」練習。';
+    cardBack.classList.add('hidden');
+    btnShow.disabled = true; btnForgot.disabled = true; btnGood.disabled = true;
+    return;
+  }
+  btnShow.disabled = false; btnForgot.disabled = true; btnGood.disabled = true;
+  cardBack.classList.add('hidden');
+  cardFront.textContent = currentCard.ko;
+  cardMeta.textContent = `${currentCard.pos||''} · 盒${currentCard.box} · 到期 ${currentCard.nextDue}`;
+  cardMeaning.textContent = currentCard.meaning || '';
+  cardExample.textContent = currentCard.examples? `例：${currentCard.examples}` : '';
+}
+
+btnShow.addEventListener('click', ()=>{ cardBack.classList.remove('hidden'); btnForgot.disabled=false; btnGood.disabled=false; });
+btnForgot.addEventListener('click', ()=>{
+  if(!currentCard) return;
+  currentCard.box = 1;
+  currentCard.nextDue = nextDueDate(currentCard.box);
+  saveData(DB);
+  refreshReview();
+});
+btnGood.addEventListener('click', ()=>{
+  if(!currentCard) return;
+  currentCard.box = Math.min((currentCard.box||1)+1, 6);
+  currentCard.nextDue = nextDueDate(currentCard.box);
+  saveData(DB);
+  refreshReview();
+});
+btnSkip.addEventListener('click', ()=>{ drawNextCard(); });
+
+// ====== Quiz: MCQ & Spelling ======
+const mcqQ = document.getElementById('mcq-question');
+const mcqOpts = document.getElementById('mcq-options');
+const mcqFb = document.getElementById('mcq-feedback');
+const btnNextMcq = document.getElementById('btn-next-mcq');
+const spellPrompt = document.getElementById('spell-prompt');
+const spellInput = document.getElementById('spell-input');
+const spellFb = document.getElementById('spell-feedback');
+const btnNextSpell = document.getElementById('btn-next-spell');
+const btnCheckSpell = document.getElementById('btn-check-spell');
+const btnShowSpell = document.getElementById('btn-show-spell');
+
+let mcqAnswer = null;
+function pickN(arr,n){ const a=[...arr]; const out=[]; while(a.length && out.length<n){ out.push(a.splice(Math.floor(Math.random()*a.length),1)[0]); } return out; }
+function newMCQ(){
+  const pool = DB.vocab.filter(v=>v.meaning && v.ko);
+  if(pool.length<4){ mcqQ.textContent='（單字不足 4 筆，請先新增單字）'; mcqOpts.innerHTML=''; return; }
+  const correct = pool[Math.floor(Math.random()*pool.length)];
+  const distractors = pickN(pool.filter(v=>v.id!==correct.id),3);
+  const options = [correct, ...distractors].sort(()=>Math.random()-0.5);
+  mcqAnswer = correct.id;
+  mcqQ.textContent = `「${correct.meaning}」的韓文是？`;
+  mcqOpts.innerHTML = '';
+  options.forEach(o=>{
+    const b = document.createElement('button');
+    b.className='btn w-full text-left';
+    b.textContent = `${o.ko}  ·  ${o.reading||''}`;
+    b.addEventListener('click',()=>{
+      DB.stats.quiz.mcqTotal++;
+      if(o.id===mcqAnswer){ DB.stats.quiz.mcqCorrect++; mcqFb.textContent='✅ 正確'; b.classList.add('btn-primary'); }
+      else{ mcqFb.textContent=`❌ 錯誤，正確：${correct.ko}`; }
+      saveData(DB);
+    });
+    mcqOpts.appendChild(b);
+  });
+  mcqFb.textContent='';
+}
+btnNextMcq.addEventListener('click', newMCQ);
+
+let spellAnswer = null;
+function newSpell(){
+  const pool = DB.vocab.filter(v=>v.meaning && v.ko);
+  if(pool.length<1){ spellPrompt.textContent='（請先新增單字）'; return; }
+  const q = pool[Math.floor(Math.random()*pool.length)];
+  spellAnswer = q.ko;
+  spellPrompt.textContent = `請輸入：${q.meaning}`;
+  spellInput.value=''; spellFb.textContent=''; spellInput.focus();
+}
+btnNextSpell.addEventListener('click', newSpell);
+btnShowSpell.addEventListener('click', ()=>{ spellFb.textContent = `答案：${spellAnswer}`; });
+btnCheckSpell.addEventListener('click', ()=>{
+  const ans = (spellInput.value||'').trim();
+  DB.stats.quiz.spellTotal++;
+  if(ans===spellAnswer){ DB.stats.quiz.spellCorrect++; spellFb.textContent='✅ 正確'; }
+  else{ spellFb.textContent = `❌ 錯誤，答案：${spellAnswer}`; }
+  saveData(DB);
+});
+
+// ====== Grammar ======
+const gramQ = document.getElementById('gram-question');
+const gramOpts = document.getElementById('gram-options');
+const gramFb = document.getElementById('gram-feedback');
+const btnNextGram = document.getElementById('btn-next-gram');
+const gramForm = document.getElementById('gram-form');
+
+function newGram(){
+  if(DB.grammar.length===0){ gramQ.textContent='（尚無文法題，請右側新增）'; gramOpts.innerHTML=''; gramFb.textContent=''; return; }
+  const q = DB.grammar[Math.floor(Math.random()*DB.grammar.length)];
+  gramQ.textContent = q.question;
+  gramOpts.innerHTML='';
+  gramFb.textContent='';
+  if(q.options && q.options.length){
+    q.options.forEach((opt,idx)=>{
+      const b=document.createElement('button');
+      b.className='btn w-full text-left';
+      b.textContent = `${String.fromCharCode(65+idx)}. ${opt}`;
+      b.addEventListener('click',()=>{
+        if(idx===q.answer){ gramFb.textContent='✅ 正確'; b.classList.add('btn-primary'); }
+        else{ gramFb.textContent = `❌ 錯誤。正確：${String.fromCharCode(65+q.answer)}. ${q.options[q.answer]}`; }
+        if(q.explanation) gramFb.textContent += `\n💡 ${q.explanation}`;
+      });
+      gramOpts.appendChild(b);
+    });
+  }else{
+    const input=document.createElement('textarea');
+    input.className='w-full border border-slate-300 rounded-xl px-3 py-2';
+    input.placeholder='請在此作答…';
+    gramOpts.appendChild(input);
+    const chk=document.createElement('button');
+    chk.className='btn mt-2 btn-primary';
+    chk.textContent='參考答案';
+    chk.addEventListener('click',()=>{
+      gramFb.textContent = `參考：${q.answer || '（開放作答）'}` + (q.explanation? `\n💡 ${q.explanation}` : '');
+    });
+    gramOpts.appendChild(chk);
+  }
+}
+btnNextGram.addEventListener('click', newGram);
+
+gramForm.addEventListener('submit', (e)=>{
+  e.preventDefault();
+  const q = document.getElementById('gq').value.trim();
+  const a = document.getElementById('ga').value.trim();
+  const optsRaw = document.getElementById('gopts').value.trim();
+  const exp = document.getElementById('gexp').value.trim();
+  if(!q||!a) return;
+  const opts = optsRaw? optsRaw.split('|').map(s=>s.trim()) : [];
+  const answer = opts.length? Math.max(0, Math.min(opts.length-1, parseInt(a))) : a;
+  DB.grammar.push({ id: uid(), question:q, options:opts, answer, explanation:exp });
+  saveData(DB);
+  e.target.reset();
+  alert('已加入文法題');
+  newGram();
+});
+
+// ====== Vocab CRUD ======
+const vSearch = document.getElementById('v-search');
+const vSort = document.getElementById('v-sort');
+const vTable = document.getElementById('vocab-table');
+
+document.getElementById('btn-add-vocab').addEventListener('click', ()=> editVocab());
+
+function renderVocab(){
+  const q = (vSearch.value||'').toLowerCase();
+  const sortBy = vSort.value;
+  let list = DB.vocab.filter(v=> !q || [v.ko,v.meaning,v.tags,v.pos].join(' ').toLowerCase().includes(q));
+  list.sort((a,b)=>{
+    if(sortBy==='box'||sortBy==='level') return (a[sortBy]||0)-(b[sortBy]||0);
+    if(sortBy==='nextDue') return (a.nextDue||'').localeCompare(b.nextDue||'');
+    return (a[sortBy]||'').localeCompare(b[sortBy]||'');
+  });
+  const rows = list.map(v=>`<tr class="border-b">\n    <td class="p-2 font-semibold">${v.ko}</td>\n    <td class="p-2">${v.meaning||''}</td>\n    <td class="p-2 text-xs text-slate-500">${v.reading||''}</td>\n    <td class="p-2 text-xs">${v.pos||''}</td>\n    <td class="p-2 text-xs">盒${v.box||1}</td>\n    <td class="p-2 text-xs">${v.nextDue||''}</td>\n    <td class="p-2 text-xs">${v.tags||''}</td>\n    <td class="p-2 text-right">\n      <button class="btn btn-ghost" data-act="edit" data-id="${v.id}">編輯</button>\n      <button class="btn" data-act="review-now" data-id="${v.id}">今日複習</button>\n      <button class="btn" data-act="del" data-id="${v.id}">刪除</button>\n    </td>\n  </tr>`).join('');
+  vTable.innerHTML = `<table class="w-full text-sm">\n    <thead><tr class="text-left text-xs text-slate-500 border-b">\n      <th class="p-2">韓文</th><th class="p-2">釋義</th><th class="p-2">讀音</th><th class="p-2">詞性</th><th class="p-2">盒位</th><th class="p-2">到期</th><th class="p-2">標籤</th><th class="p-2"></th>\n    </tr></thead>\n    <tbody>${rows}</tbody>\n  </table>`;
+  vTable.querySelectorAll('button[data-id]').forEach(btn=>{
+    const id = btn.dataset.id; const act = btn.dataset.act;
+    btn.addEventListener('click', ()=>{
+      if(act==='edit') editVocab(DB.vocab.find(v=>v.id===id));
+      if(act==='del') { if(confirm('確定刪除？')){ DB.vocab = DB.vocab.filter(v=>v.id!==id); saveData(DB); renderVocab(); refreshReview(); } }
+      if(act==='review-now'){ const v=DB.vocab.find(v=>v.id===id); v.nextDue=todayStr(); saveData(DB); alert('已設為今日到期'); refreshReview(); }
+    });
+  });
+}
+
+function editVocab(item){
+  const data = item || { id: uid(), ko:'', reading:'', pos:'', meaning:'', examples:'', tags:'', level:1, box:1, nextDue: todayStr() };
+  const wrapper = document.createElement('div');
+  wrapper.className='fixed inset-0 bg-black/30 flex items-center justify-center p-4';
+  wrapper.innerHTML = `
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl p-6">
+      <h3 class="font-semibold mb-3">${item? '編輯單字' : '新增單字'}</h3>
+      <div class="grid md:grid-cols-2 gap-3 text-sm">
+        <label>韓文<input id="ek" class="w-full border border-slate-300 rounded-xl px-3 py-2" value="${data.ko}"></label>
+        <label>讀音<input id="er" class="w-full border border-slate-300 rounded-xl px-3 py-2" value="${data.reading}"></label>
+        <label>詞性<input id="ep" class="w-full border border-slate-300 rounded-xl px-3 py-2" value="${data.pos}"></label>
+        <label>釋義<input id="em" class="w-full border border-slate-300 rounded-xl px-3 py-2" value="${data.meaning}"></label>
+        <label class="md:col-span-2">例句<textarea id="ee" class="w-full border border-slate-300 rounded-xl px-3 py-2">${data.examples}</textarea></label>
+        <label>標籤<input id="et" class="w-full border border-slate-300 rounded-xl px-3 py-2" value="${data.tags}"></label>
+        <label>難度<input id="el" type="number" min="1" max="5" class="w-full border border-slate-300 rounded-xl px-3 py-2" value="${data.level}"></label>
+        <label>盒位<input id="eb" type="number" min="1" max="6" class="w-full border border-slate-300 rounded-xl px-3 py-2" value="${data.box}"></label>
+        <label>到期<input id="ed" type="date" class="w-full border border-slate-300 rounded-xl px-3 py-2" value="${data.nextDue}"></label>
+      </div>
+      <div class="flex justify-end gap-2 mt-4">
+        <button class="btn" id="cancel">取消</button>
+        ${item? '<button class="btn" id="delete">刪除</button>' : ''}
+        <button class="btn btn-primary" id="save">儲存</button>
+      </div>
+    </div>`;
+  document.body.appendChild(wrapper);
+  wrapper.querySelector('#cancel').onclick=()=>wrapper.remove();
+  if(item){ wrapper.querySelector('#delete').onclick=()=>{ if(confirm('確定刪除？')){ DB.vocab = DB.vocab.filter(v=>v.id!==item.id); saveData(DB); renderVocab(); refreshReview(); wrapper.remove(); } } }
+  wrapper.querySelector('#save').onclick=()=>{
+    const v = {
+      id: data.id,
+      ko: wrapper.querySelector('#ek').value.trim(),
+      reading: wrapper.querySelector('#er').value.trim(),
+      pos: wrapper.querySelector('#ep').value.trim(),
+      meaning: wrapper.querySelector('#em').value.trim(),
+      examples: wrapper.querySelector('#ee').value.trim(),
+      tags: wrapper.querySelector('#et').value.trim(),
+      level: parseInt(wrapper.querySelector('#el').value)||1,
+      box: Math.max(1, Math.min(6, parseInt(wrapper.querySelector('#eb').value)||1 )),
+      nextDue: wrapper.querySelector('#ed').value || todayStr(),
+    };
+    if(!v.ko || !v.meaning){ alert('韓文與釋義為必填'); return; }
+    if(item){ const idx = DB.vocab.findIndex(x=>x.id===item.id); DB.vocab[idx]=v; }
+    else{ DB.vocab.push(v); }
+    saveData(DB); renderVocab(); refreshReview(); wrapper.remove();
+  };
+}
+
+vSearch.addEventListener('input', renderVocab);
+vSort.addEventListener('change', renderVocab);
+
+// ====== Settings / Import / Export ======
+const sIntervals = document.getElementById('s-intervals');
+const sDaily = document.getElementById('s-daily');
+const btnSaveSettings = document.getElementById('btn-save-settings');
+const btnReset = document.getElementById('btn-reset');
+const btnExport = document.getElementById('btn-export');
+const btnImport = document.getElementById('btn-import');
+const fileImport = document.getElementById('file-import');
+
+function renderSettings(){
+  sIntervals.value = (DB.settings.leitnerIntervals||[0,1,2,4,7,15]).join(',');
+  sDaily.value = DB.settings.dailyNew||20;
+}
+btnSaveSettings.addEventListener('click', ()=>{
+  const intervals = sIntervals.value.split(',').map(s=>parseInt(s.trim())).filter(n=>!Number.isNaN(n));
+  DB.settings.leitnerIntervals = intervals.length? intervals : [0,1,2,4,7,15];
+  DB.settings.dailyNew = Math.max(1, parseInt(sDaily.value)||20);
+  saveData(DB);
+  alert('設定已儲存');
+});
+
+btnReset.addEventListener('click', ()=>{
+  if(confirm('確定要清除所有資料？此動作無法復原。')){ DB = structuredClone(SAMPLE_DATA); saveData(DB); location.reload(); }
+});
+
+btnExport.addEventListener('click', ()=>{
+  const blob = new Blob([JSON.stringify(DB, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `krstudy-backup-${todayStr()}.json`; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url), 1000);
+});
+
+btnImport.addEventListener('click', ()=> fileImport.click());
+fileImport.addEventListener('change', (e)=>{
+  const file = e.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    try{
+      const data = JSON.parse(reader.result);
+      if(!data.vocab || !data.grammar) throw new Error('格式不正確');
+      DB = data; saveData(DB); alert('匯入成功'); location.reload();
+    }catch(err){ alert('匯入失敗：'+err.message); }
+  };
+  reader.readAsText(file);
+});
+
+// ====== Init ======
+function init(){
+  refreshReview();
+  newMCQ();
+  newSpell();
+  newGram();
+}
+init();
+
+</script>
+</body>
+</html>
